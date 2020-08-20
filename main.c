@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "lcd.h"
 
 
 #define FOSC 7372800UL// Clock Speed
@@ -32,11 +33,12 @@ unsigned char USART_Receive( void ){
 
 void USART_Receive_Line(char data[] ){
 	unsigned int i = 0;
-	while(data[i-1] != '\r'){
+	while(data[i-1] != 13){
 		data[i] = USART_Receive();
 		i++;
 	}
-	data[i] = '\0';
+	data[i] = USART_Receive();
+	data[i-1] = '\0';
 }
 
 void USART_Transmit( unsigned char data ){
@@ -54,37 +56,47 @@ void USART_Transmits(char data[] ) {
 
 	for(i = 0; i < strlen(data); i++) {
 		USART_Transmit(data[i]);
-		_delay_ms(25);
+		_delay_ms(50);
 	}
 }
 
 
-void USART_Wait_For( char data[], unsigned int chars){
-	char line[32];
+void USART_Wait_For(char data[]){
+	char line[64];
 	
 	int compare = 1;
 	while(compare != 0){
 		USART_Receive_Line(line);
-		compare = strncmp(data, line, chars);	
+		compare = strncmp(data, line, strlen(data));
+		lcd_clrscr();
+		lcd_puts(line);
 	}
 }
 
 
 int main( void ){
+	DDRD = _BV(4);
 	USART_Init ( 51 );
-
-	_delay_ms(5000);
-	USART_Transmits("Hello There!\r\r");
+	lcd_init(LCD_DISP_ON);
+	lcd_clrscr();
 	
-	_delay_ms(2000);
-	USART_Transmits("General Kenobi!\r");
-
+	lcd_puts("Booting...");
+	
+	char sind4[] = "+SIND: 4";
+	_delay_ms(1000);
+	USART_Wait_For(sind4);
+	lcd_clrscr();
+	lcd_puts("GSM OK\nConnecting...");
+	
+	char sind11[] = "+SIND: 11";
+	_delay_ms(1000);
+	USART_Wait_For(sind11);
+	lcd_clrscr();
+	lcd_puts("Success!\nConnected!\n");
+	
 	while(1){
-		char str[] = "+SIND: 11";
-		USART_Wait_For(str, strlen(str));
 		
-		USART_Transmits("GOT SIND 11");
-		_delay_ms(10000);
+		_delay_ms(3000);
 	}
 	return 0;
 }
