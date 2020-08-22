@@ -64,14 +64,52 @@ void USART_Transmits(char data[] ) {
 void USART_Wait_For(char data[]){
 	char line[64];
 	
+	int row=0;
 	int compare = 1;
 	while(compare != 0){
 		USART_Receive_Line(line);
 		compare = strncmp(data, line, strlen(data));
-		
-		//lcd_clrscr();
+	
 		lcd_puts(line);
+		lcd_puts("\n");
+		_delay_ms(2000);
+		lcd_clrscr();
 	}
+}
+
+void USART_Retry_Until(char command[], char message[]){
+	char line[64];
+	USART_Transmits(command);
+	
+	int compare = 1;
+	while(compare != 0){
+		USART_Receive_Line(line);
+		compare = strncmp(message, line, strlen(message));
+		
+		if(compare == 0){
+			break;
+		} else {
+			_delay_ms(1000);
+			USART_Transmits(command);
+		}
+	}
+}
+
+void GSM_Read_Msg(){
+	char message1[128];
+	char message2[128];
+	
+	USART_Receive_Line(message1); // get first line in message ignore that
+	USART_Receive_Line(message2); // get the actual message
+	
+	lcd_puts(message1);
+	_delay_ms(5000);
+	
+	lcd_clrscr();
+	
+	lcd_puts(message2);
+
+	//USART_Wait_For("OK"); // last one should be "OK"
 }
 
 
@@ -85,65 +123,50 @@ int main( void ){
 	
 	lcd_puts("Booting...");
 	
-	
-	/*
-	char sind4[] = "+SIND: 4";
-	_delay_ms(1000);
-	USART_Wait_For(sind4);
-	lcd_clrscr();
-	lcd_puts("GSM OK\nConnecting...");
-	
+	/*	
 	char sind11[] = "+SIND: 11";
 	_delay_ms(1000);
 	USART_Wait_For(sind11);
 	lcd_clrscr();
 	lcd_puts("Success!\nConnected!\n");
+
+	_delay_ms(5000);
 	
+	lcd_puts("SENDING SMS");
+	USART_Retry_Until("AT+CMGF=1\r", "OK");
+	
+	lcd_clrscr();
+	_delay_ms(2000);
+
+
+
+	USART_Transmits("AT+CMGS=\"0998304164\"\r");
+	
+	_delay_ms(2000);
+	
+	USART_Transmits("Posalji nest nazaj npr 20 c\x1A\r");
+	
+	USART_Wait_For("OK");
+	
+	lcd_clrscr();
+
+	
+	lcd_puts("Waiting 30s for\nresponse");
+	
+	_delay_ms(30000);
 	*/
 	
-	
-	_delay_ms(5000);
-	
 	lcd_clrscr();
 	
-	USART_Transmits("AT+CGATT=1\r");
-
-	USART_Wait_For("OK");
-	_delay_ms(5000);
-	lcd_clrscr();
-	
-	USART_Transmits("AT+CGDCONT=1,\"IP\",\"internet.ht.hr\"\r");
-	USART_Wait_For("OK");
+	USART_Retry_Until("AT+CMGF=1\r", "OK");
 	_delay_ms(1000);
-	lcd_clrscr();
 	
-	 lcd_puts("Activating PDP Context...\n");
-	 USART_Transmits("AT+CGACT=1,1\r");
-	 lcd_clrscr();
-	 USART_Wait_For("OK");
-	 
-		lcd_clrscr();
-	 
-	 lcd_puts("Configuring TCP connection to TCP Server...");
-	 
 	lcd_clrscr();
-	 USART_Transmits("AT+SDATACONF=1,\"TCP\",\"3.127.76.126\",80");
-	 USART_Wait_For("OK");
-	 
-	 lcd_puts("Starting TCP Connection...");
-	 USART_Transmits("AT+SDATASTART=1,1");
-	 USART_Wait_For("OK");
-	 
+	USART_Transmits("AT+CMGR=4\r");
 	
-  
-	 _delay_ms(5000); // wait for the socket to connect
-  
-
-	lcd_puts("Checking socket status:");
-	USART_Transmits("AT+SDATASTATUS=1");
-	USART_Wait_For("OK");
-	USART_Wait_For("+SOCKSTATUS:  1,1,0102,0,0,0");
-		
+	
+	GSM_Read_Msg();
+	
 	while(1){
 		_delay_ms(500);
 	}
