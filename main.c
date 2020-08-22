@@ -56,7 +56,7 @@ void USART_Transmits(char data[] ) {
 
 	for(i = 0; i < strlen(data); i++) {
 		USART_Transmit(data[i]);
-		_delay_ms(50);
+		_delay_ms(25);
 	}
 }
 
@@ -68,7 +68,8 @@ void USART_Wait_For(char data[]){
 	while(compare != 0){
 		USART_Receive_Line(line);
 		compare = strncmp(data, line, strlen(data));
-		lcd_clrscr();
+		
+		//lcd_clrscr();
 		lcd_puts(line);
 	}
 }
@@ -79,9 +80,13 @@ int main( void ){
 	USART_Init ( 51 );
 	lcd_init(LCD_DISP_ON);
 	lcd_clrscr();
+
+	_delay_ms(2000);
 	
 	lcd_puts("Booting...");
 	
+	
+	/*
 	char sind4[] = "+SIND: 4";
 	_delay_ms(1000);
 	USART_Wait_For(sind4);
@@ -94,9 +99,54 @@ int main( void ){
 	lcd_clrscr();
 	lcd_puts("Success!\nConnected!\n");
 	
-	while(1){
+	*/
+	
+	
+	_delay_ms(5000);
+	
+	lcd_clrscr();
+	
+	USART_Transmits("AT+CGATT=1\r");
+
+	USART_Wait_For("OK");
+	_delay_ms(5000);
+	lcd_clrscr();
+	
+	USART_Transmits("AT+CGDCONT=1,\"IP\",\"internet.ht.hr\"\r");
+	USART_Wait_For("OK");
+	_delay_ms(1000);
+	lcd_clrscr();
+	
+	 lcd_puts("Activating PDP Context...\n");
+	 USART_Transmits("AT+CGACT=1,1\r");
+	 lcd_clrscr();
+	 USART_Wait_For("OK");
+	 
+		lcd_clrscr();
+	 
+	 lcd_puts("Configuring TCP connection to TCP Server...");
+	 
+	lcd_clrscr();
+	 USART_Transmits("AT+SDATACONF=1,\"TCP\",\"3.127.76.126\",80");
+	 USART_Wait_For("OK");
+	 
+	 lcd_puts("Starting TCP Connection...");
+	 USART_Transmits("AT+SDATASTART=1,1");
+	 USART_Wait_For("OK");
+	 
+	
+  
+	 _delay_ms(5000); // wait for the socket to connect
+  
+
+	lcd_puts("Checking socket status:");
+	USART_Transmits("AT+SDATASTATUS=1");
+	USART_Wait_For("OK");
+	USART_Wait_For("+SOCKSTATUS:  1,1,0102,0,0,0");
 		
-		_delay_ms(3000);
+	while(1){
+		_delay_ms(500);
 	}
+	 
 	return 0;
 }
