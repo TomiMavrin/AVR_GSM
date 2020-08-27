@@ -140,7 +140,7 @@ int main( void ){
 
 
 
-	USART_Transmits("AT+CMGS=\"0998304164\"\r");
+	USART_Transmits("AT+CMGS=\"xxxxxxxxx\"\r");
 	
 	_delay_ms(2000);
 	
