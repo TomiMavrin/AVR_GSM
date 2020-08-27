@@ -87,7 +87,7 @@ void USART_Retry_Until(char command[], char message[]){
 		
 		if(compare == 0){
 			break;
-		} else {
+			} else {
 			_delay_ms(1000);
 			USART_Transmits(command);
 		}
@@ -145,7 +145,7 @@ void GSM_Read_Msg(unsigned int index){
 	
 	if(isMessage == 0){
 		GSM_Read_Msg(index);
-	} else {
+		} else {
 		lcd_puts(message1);
 		_delay_ms(1000);
 		lcd_clrscr();
@@ -184,7 +184,7 @@ void Init_Prog(){
 	USART_Init ( 51 );
 	lcd_init(LCD_DISP_ON);
 	lcd_clrscr();
-		
+	
 	//interrupts
 	MCUCR = _BV(ISC01) | _BV(ISC11);
 	GICR = _BV(INT0) | _BV(INT1);
@@ -207,13 +207,13 @@ int main( void ){
 	lcd_clrscr();
 	
 	// Saljemo poruku, koristimo komande:
-	// AT+CMGF da bi postavili text mode 
+	// AT+CMGF da bi postavili text mode
 	// AT+CMGS da bu poslali poruku
 	
 	// Simuliramo zahtjev s slanjem poruke "Zagreb" za
 	// vremensku prognozu u Zagrebu
 	lcd_puts("Sending message");
-	_delay_ms(3000);	
+	_delay_ms(3000);
 	GSM_Send_SMS("Zagreb", "xxxxxxxxx");
 	lcd_clrscr();
 	
@@ -223,14 +223,14 @@ int main( void ){
 	lcd_clrscr();
 	
 	// Citamo poruku na indexu
-	GSM_Read_Msg(1); 
-	// read message at index, 
+	GSM_Read_Msg(1);
+	// read message at index,
 	//"ALL" method is unreliable
 	//index should be 0-9, last index is last message
 
 	while(1){
 		_delay_ms(500);
 	}
-	 
+	
 	return 0;
 }
