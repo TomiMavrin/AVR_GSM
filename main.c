@@ -6,11 +6,14 @@
 #include <stdio.h>
 #include <string.h>
 #include "lcd.h"
+#include <avr/interrupt.h>
 
 
 #define FOSC 7372800UL// Clock Speed
 #define BAUD 9600
 #define MYUBRR FOSC/16/BAUD-1 // Ne radi -> ovo iznosi 47 -> 51 radi
+
+unsigned int messageIndex= 0;
 
 void USART_Init( unsigned int ubrr){
 	/* Set baud rate */
@@ -63,17 +66,13 @@ void USART_Transmits(char data[] ) {
 
 void USART_Wait_For(char data[]){
 	char line[64];
-	
-	int row=0;
+
 	int compare = 1;
 	while(compare != 0){
 		USART_Receive_Line(line);
 		compare = strncmp(data, line, strlen(data));
-	
-		lcd_puts(line);
-		lcd_puts("\n");
-		_delay_ms(2000);
 		lcd_clrscr();
+		lcd_puts(line);
 	}
 }
 
@@ -95,78 +94,140 @@ void USART_Retry_Until(char command[], char message[]){
 	}
 }
 
-void GSM_Read_Msg(){
+void GSM_Wait_For_Boot(){
+	char sind11[] = "+SIND: 11";
+	_delay_ms(1000);
+	USART_Wait_For(sind11); // waiting for SIND: 11 -> connected to network status
+	lcd_clrscr();
+	lcd_puts("Success!\nConnected!\n");
+}
+
+void GSM_Send_SMS(char *sms, char *number){
+	lcd_puts("SENDING SMS");
+	USART_Retry_Until("AT+CMGF=1\r", "OK");
+	lcd_clrscr();
+	_delay_ms(2000);
+
+	USART_Transmits("AT+CMGS=\"");
+	USART_Transmits(number);
+	USART_Transmits("\"\r");
+	
+	_delay_ms(5000);
+	
+	USART_Transmits(sms);
+	USART_Transmits("\x1A\r");
+	USART_Wait_For("OK");
+	lcd_clrscr();
+}
+
+void GSM_Read_Msg(unsigned int index){
+	USART_Retry_Until("AT+CMGF=1\r", "OK");
+	
+	int isMessage = 1;
+	_delay_ms(1000);
+	
+	lcd_clrscr();
+	
+	char command[] = "AT+CMGR=0\r\0";
+	command[8]= 48+index;
+	
+	USART_Transmits(command);
+	
 	char message1[128];
 	char message2[128];
 	
 	USART_Receive_Line(message1); // get first line in message ignore that
 	USART_Receive_Line(message2); // get the actual message
 	
-	lcd_puts(message1);
-	_delay_ms(5000);
-	
-	lcd_clrscr();
-	
-	lcd_puts(message2);
-
 	//USART_Wait_For("OK"); // last one should be "OK"
+	
+	isMessage = strcmp("OK", message2);
+	
+	if(isMessage == 0){
+		GSM_Read_Msg(index);
+	} else {
+		lcd_puts(message1);
+		_delay_ms(1000);
+		lcd_clrscr();
+		lcd_puts(message2);
+	}
+}
+
+void debounce() {
+	_delay_ms(2000);
+	GIFR = _BV(INTF0) | _BV(INTF1);
+}
+
+// Prikazujemo prijasnju poruku (po indexu)
+ISR(INT0_vect) {
+	if(messageIndex > 0){
+		messageIndex--;
+	}
+	lcd_clrscr();
+	lcd_puts("Button 2");
+	GSM_Read_Msg(messageIndex);
+	debounce();
+}
+
+// Prikazujemo sljedecu poruku (po indexu)
+ISR(INT1_vect) {
+	messageIndex++;
+	lcd_clrscr();
+	lcd_puts("Button 1");
+	GSM_Read_Msg(messageIndex);
+	debounce();
 }
 
 
-int main( void ){
+void Init_Prog(){
 	DDRD = _BV(4);
 	USART_Init ( 51 );
 	lcd_init(LCD_DISP_ON);
 	lcd_clrscr();
+		
+	//interrupts
+	MCUCR = _BV(ISC01) | _BV(ISC11);
+	GICR = _BV(INT0) | _BV(INT1);
+	sei();
+}
 
+
+int main( void ){
+
+	Init_Prog();
+	
 	_delay_ms(2000);
 	
 	lcd_puts("Booting...");
 	
-	/*	
-	char sind11[] = "+SIND: 11";
-	_delay_ms(1000);
-	USART_Wait_For(sind11);
-	lcd_clrscr();
-	lcd_puts("Success!\nConnected!\n");
+	//Cekamo "+SIND: 11" Koji znaci da se modul spojio na toranj
+	GSM_Wait_For_Boot();
 
 	_delay_ms(5000);
-	
-	lcd_puts("SENDING SMS");
-	USART_Retry_Until("AT+CMGF=1\r", "OK");
-	
 	lcd_clrscr();
-	_delay_ms(2000);
-
-
-
-	USART_Transmits("AT+CMGS=\"0998304164\"\r");
 	
-	_delay_ms(2000);
+	// Saljemo poruku, koristimo komande:
+	// AT+CMGF da bi postavili text mode 
+	// AT+CMGS da bu poslali poruku
 	
-	USART_Transmits("Posalji nest nazaj npr 20 c\x1A\r");
-	
-	USART_Wait_For("OK");
-	
+	// Simuliramo zahtjev s slanjem poruke "Zagreb" za
+	// vremensku prognozu u Zagrebu
+	lcd_puts("Sending message");
+	_delay_ms(3000);	
+	GSM_Send_SMS("Zagreb", "xxxxxxxxx");
 	lcd_clrscr();
-
 	
+	// Cekamo 30s da se vrati poruka
 	lcd_puts("Waiting 30s for\nresponse");
-	
-	_delay_ms(30000);
-	*/
-	
+	_delay_ms(50000);
 	lcd_clrscr();
 	
-	USART_Retry_Until("AT+CMGF=1\r", "OK");
-	_delay_ms(1000);
-	
-	lcd_clrscr();
-	USART_Transmits("AT+CMGR=4\r");
-	
-	
-	GSM_Read_Msg();
-	
+	// Citamo poruku na indexu
+	GSM_Read_Msg(1); 
+	// read message at index, 
+	//"ALL" method is unreliable
+	//index should be 0-9, last index is last message
+
 	while(1){
 		_delay_ms(500);
 	}
