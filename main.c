@@ -13,7 +13,7 @@
 #define BAUD 9600
 #define MYUBRR FOSC/16/BAUD-1 // Ne radi -> ovo iznosi 47 -> 51 radi
 
-unsigned int messageIndex= 0;
+unsigned int messageIndex= 1;
 
 void USART_Init( unsigned int ubrr){
 	/* Set baud rate */
@@ -104,10 +104,13 @@ void GSM_Wait_For_Boot(){
 
 void GSM_Send_SMS(char *sms, char *number){
 	lcd_puts("SENDING SMS");
-	USART_Retry_Until("AT+CMGF=1\r", "OK");
 	lcd_clrscr();
-	_delay_ms(2000);
+	_delay_ms(3000);
 
+	// AT+CMGS="0992803500"
+	// >
+	// poruka0x1A\r
+	// OK
 	USART_Transmits("AT+CMGS=\"");
 	USART_Transmits(number);
 	USART_Transmits("\"\r");
@@ -121,9 +124,7 @@ void GSM_Send_SMS(char *sms, char *number){
 }
 
 void GSM_Read_Msg(unsigned int index){
-	USART_Retry_Until("AT+CMGF=1\r", "OK");
 	
-	int isMessage = 1;
 	_delay_ms(1000);
 	
 	lcd_clrscr();
@@ -135,22 +136,18 @@ void GSM_Read_Msg(unsigned int index){
 	
 	char message1[128];
 	char message2[128];
+
 	
 	USART_Receive_Line(message1); // get first line in message ignore that
 	USART_Receive_Line(message2); // get the actual message
 	
-	//USART_Wait_For("OK"); // last one should be "OK"
+	UDR = 0x00; //clear buffer (might get "OK" or nothing, clear eather way)
 	
-	isMessage = strcmp("OK", message2);
-	
-	if(isMessage == 0){
-		GSM_Read_Msg(index);
-		} else {
-		lcd_puts(message1);
-		_delay_ms(1000);
-		lcd_clrscr();
-		lcd_puts(message2);
-	}
+	lcd_clrscr();
+	lcd_puts(message1);
+	_delay_ms(200);
+	lcd_clrscr();
+	lcd_puts(message2);
 }
 
 void debounce() {
@@ -160,20 +157,20 @@ void debounce() {
 
 // Prikazujemo prijasnju poruku (po indexu)
 ISR(INT0_vect) {
-	if(messageIndex > 0){
+	if(messageIndex > 1){
 		messageIndex--;
 	}
 	lcd_clrscr();
-	lcd_puts("Button 2");
 	GSM_Read_Msg(messageIndex);
 	debounce();
 }
 
 // Prikazujemo sljedecu poruku (po indexu)
 ISR(INT1_vect) {
-	messageIndex++;
+	if(messageIndex < 9){
+		messageIndex++;	
+	}
 	lcd_clrscr();
-	lcd_puts("Button 1");
 	GSM_Read_Msg(messageIndex);
 	debounce();
 }
@@ -203,30 +200,33 @@ int main( void ){
 	//Cekamo "+SIND: 11" Koji znaci da se modul spojio na toranj
 	GSM_Wait_For_Boot();
 
-	_delay_ms(5000);
+	//_delay_ms(5000);
 	lcd_clrscr();
 	
 	// Saljemo poruku, koristimo komande:
 	// AT+CMGF da bi postavili text mode
 	// AT+CMGS da bu poslali poruku
 	
+	USART_Retry_Until("AT+CMGF=1\r", "OK");
+	
 	// Simuliramo zahtjev s slanjem poruke "Zagreb" za
 	// vremensku prognozu u Zagrebu
 	lcd_puts("Sending message");
 	_delay_ms(3000);
-	GSM_Send_SMS("Zagreb", "xxxxxxxxx");
-	lcd_clrscr();
+	GSM_Send_SMS("Zagreb", "0921739912");
+	
+	//lcd_clrscr();
 	
 	// Cekamo 30s da se vrati poruka
 	lcd_puts("Waiting 30s for\nresponse");
-	_delay_ms(50000);
+	_delay_ms(30000);
 	lcd_clrscr();
 	
 	// Citamo poruku na indexu
-	GSM_Read_Msg(1);
+	GSM_Read_Msg(7);
 	// read message at index,
 	//"ALL" method is unreliable
-	//index should be 0-9, last index is last message
+	//index should be 1-9, last index is last message
 
 	while(1){
 		_delay_ms(500);
